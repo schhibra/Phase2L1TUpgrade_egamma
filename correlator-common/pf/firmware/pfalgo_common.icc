@@ -1,0 +1,364 @@
+// vim: syntax=cpp
+
+template<int NB>
+ap_uint<NB> dr2_int_cap(eta_t eta1, eta_t phi1, eta_t eta2, eta_t phi2, ap_uint<NB> max) {
+    ap_int<eta_t::width+1> deta = (eta1-eta2);
+    ap_int<phi_t::width+1> dphi = (phi1-phi2);
+    //ap_int<phi_t::width> dphi = (phi1-phi2); // intentional wrap-around
+#ifdef L1PF_DSP_LATENCY3
+    int deta2 = deta*deta;
+    int dphi2 = dphi*dphi;
+    #pragma HLS resource variable=deta2 latency=3
+    #pragma HLS resource variable=dphi2 latency=3
+    int dr2 = deta2 + dphi2;
+#else
+    int dr2 = deta*deta + dphi*dphi;
+#endif
+
+
+    return (dr2 < int(max) ? ap_uint<NB>(dr2) : max);
+}
+
+template<int NB, typename PTS_t>
+ap_uint<NB> dr2_dpt_int_cap(eta_t eta1, eta_t phi1, eta_t eta2, eta_t phi2, pt_t pt1, pt_t pt2, PTS_t ptscale, ap_uint<NB> dr2max, ap_uint<NB> max) {
+    ap_int<eta_t::width+1> deta = (eta1-eta2);
+    ap_int<phi_t::width+1> dphi = (phi1-phi2);
+    //ap_int<phi_t::width> dphi = (phi1-phi2); // intentional wrap-around
+#ifdef L1PF_DSP_LATENCY3
+    int deta2 = deta*deta;
+    int dphi2 = dphi*dphi;
+    #pragma HLS resource variable=deta2 latency=3
+    #pragma HLS resource variable=dphi2 latency=3
+    int dr2 = deta2 + dphi2;
+#else
+    int dr2 = deta*deta + dphi*dphi;
+#endif
+    pt_t dpt = pt1 - pt2;
+    ap_ufixed<26,22,AP_TRN,AP_SAT> dpt2 = dpt*dpt; // the clipping to the max is done automatically
+    int dpt2scaled = dpt2*ptscale;
+#ifdef L1PF_DSP_LATENCY3
+    #pragma HLS resource variable=dpt2 latency=3
+    #pragma HLS resource variable=dpt2scaled latency=3
+#endif
+    int dq = dr2 + dpt2scaled;
+    return ((dr2 < int(dr2max)) && (dq < int(max))) ? ap_uint<NB>(dq) : max;
+}
+
+template<int NB, typename PTS_t>
+ap_uint<NB> dr2_plus_dpt_int_cap(int dr2, pt_t pt1, pt_t pt2, PTS_t ptscale, ap_uint<NB> dr2max, ap_uint<NB> max) {
+    dpt_t dpt = dpt_t(pt1) - dpt_t(pt2);
+    if (dpt < 0) dpt = 0;
+    ap_ufixed<26,22,AP_TRN,AP_SAT> dpt2 = dpt*dpt; // the clipping to the max is done automatically
+    int dpt2scaled = dpt2*ptscale;
+#ifdef L1PF_DSP_LATENCY3
+    #pragma HLS resource variable=dpt2 latency=3
+    #pragma HLS resource variable=dpt2scaled latency=3
+#endif
+    int dq = dr2 + dpt2scaled;
+    return ((dr2 < int(dr2max)) && (dq < int(max))) ? ap_uint<NB>(dq) : max;
+}
+
+template<typename T, int NIn, int NOut>
+void ptsort_hwopt(const T in[NIn], T out[NOut]) {
+    T tmp[NOut];
+    #pragma HLS ARRAY_PARTITION variable=tmp complete
+
+    for (int iout = 0; iout < NOut; ++iout) {
+        #pragma HLS unroll
+        tmp[iout].hwPt = 0;
+    }
+
+    for (int it = 0; it < NIn; ++it) {
+        for (int iout = NOut-1; iout >= 0; --iout) {
+            if (tmp[iout].hwPt <= in[it].hwPt) {
+                if (iout == 0 || tmp[iout-1].hwPt > in[it].hwPt) {
+                    tmp[iout] = in[it];
+                } else {
+                    tmp[iout] = tmp[iout-1];
+                }
+            }
+        }
+
+    }
+    for (int iout = 0; iout < NOut; ++iout) {
+        out[iout] = tmp[iout];
+    }
+
+}
+//----------------------------------
+template<int DR2MAX>
+void tk2calo_drvals(const HadCaloObj calo[NCALO], const TkObj track[NTRACK], const pt_t tkPtErr[NTRACK], tk2calo_dr_t calo_track_drval[NTRACK][NCALO]) {
+    const tk2calo_dr_t eDR2MAX = DR2MAX;
+    for (int it = 0; it < NTRACK; ++it) {
+        pt_t caloPtMin = track[it].hwPt - 2*tkPtErr[it];
+        if (caloPtMin < 0) caloPtMin = 0;
+        for (int icalo = 0; icalo < NCALO; ++icalo) {
+            if (calo[icalo].hwPt > caloPtMin) {
+                calo_track_drval[it][icalo] = dr2_int_cap(track[it].hwEta, track[it].hwPhi, calo[icalo].hwEta, calo[icalo].hwPhi, eDR2MAX);
+            } else {
+                calo_track_drval[it][icalo] = eDR2MAX;
+            }
+        }
+    }
+}
+
+template<int DR2MAX>
+void init_dr2max_times_pterr2_inv(ptscale_t vals[512]) {
+    for (int i = 0; i < 512; ++i) {
+        float pt = Scales::makePt(i ? i : 1);
+        vals[i] = float(DR2MAX)/(pt*pt);
+    }
+}
+
+template<int DR2MAX>
+ptscale_t calc_dptscale(pt_t trackHwPtErr) {
+    #pragma HLS INLINE recursive
+    // LUT for 1/ptErr2
+    ptscale_t _dr2max_times_pterr2_inv_vals[512];
+    init_dr2max_times_pterr2_inv<DR2MAX>(_dr2max_times_pterr2_inv_vals);
+    int index = Scales::ptToInt(trackHwPtErr);
+    if (index < 512) {
+        return _dr2max_times_pterr2_inv_vals[index];
+    } else {
+        return 0;
+    }
+}
+
+template<int DR2MAX>
+void tk2calo_drdptvals(const HadCaloObj calo[NCALO], const TkObj track, const pt_t tkPtErr, tk2calo_dq_t calo_track_drval[NCALO]) {
+    const tk2calo_dq_t eDR2MAX = DR2MAX;
+    const tk2calo_dq_t eDQMAX  = 5*DR2MAX; // at most we're 2 sigma away in pt, so that's a factor 4
+    // now, DR2MAX is 10 bits, so dptscale max is at most 10+8 bits = 18 bits // FIXME: GP: this is no longer correct
+    pt_t caloPtMin = track.hwPt - 2*tkPtErr;
+    ptscale_t dptscale  = calc_dptscale<DR2MAX>(tkPtErr);
+    if (caloPtMin < 0) caloPtMin = 0;
+    for (int icalo = 0; icalo < NCALO; ++icalo) {
+        if (track.isPFLoose() && calo[icalo].hwPt > caloPtMin) {
+            calo_track_drval[icalo] = dr2_dpt_int_cap(track.hwEta, track.hwPhi, calo[icalo].hwEta, calo[icalo].hwPhi, track.hwPt, calo[icalo].hwPt, dptscale, eDR2MAX, eDQMAX);
+        } else {
+            calo_track_drval[icalo] = eDQMAX;
+        }
+    }
+}
+
+template<typename DR_T, typename INDEX_T> struct match { 
+    DR_T val; INDEX_T idx; 
+    match(DR_T dr, int i) : val(dr), idx(i) {}
+    match() {}
+
+    static match best(const match & m1, const match & m2) {
+        #pragma HLS inline
+        return (m1.val <= m2.val) ? m1 : m2;
+    }
+};
+
+template<typename MATCH_T, int N> struct picker_of_closest {
+    static MATCH_T pick(const MATCH_T in[N]) {
+        #pragma HLS inline
+        static constexpr int halfWidth = N / 2;
+        static constexpr int reducedSize = halfWidth + N % 2;
+        MATCH_T reduced[reducedSize];
+        #pragma HLS ARRAY_PARTITION variable=reduced complete
+        for (int i = 0; i < halfWidth; ++i) {
+            #pragma HLS unroll
+            reduced[i] = MATCH_T::best(in[2*i], in[2*i+1]);
+        }
+        if (halfWidth != reducedSize) {
+            reduced[reducedSize - 1] = in[N - 1];
+        }
+        return picker_of_closest<MATCH_T,reducedSize>::pick(reduced);
+    }
+};
+
+template<typename MATCH_T> 
+struct picker_of_closest<MATCH_T,2> {
+    static MATCH_T pick(const MATCH_T vals[2]) {
+        #pragma HLS inline
+        return MATCH_T::best(vals[0],vals[1]);
+    }
+};
+
+template<typename MATCH_T> 
+struct picker_of_closest<MATCH_T,1> {
+    static MATCH_T pick(const MATCH_T vals[1]) {
+        #pragma HLS inline
+        return vals[0];
+    }
+};
+
+template<int DR2MAX, int NCA, typename DR_T>
+ap_uint<NCA>  pick_closest(const DR_T calo_track_drval[NCA]) {
+    const DR_T eDR2MAX = DR2MAX;
+    typedef match<DR_T,ap_uint<ct_log2_ceil<NCA>::value>> match_t;
+    match_t candidates[NCA];
+    #pragma HLS ARRAY_PARTITION variable=candidates complete
+    for (int i = 0; i < NCA; ++i) {
+        candidates[i] = match_t(calo_track_drval[i], i);
+    }
+    match_t best = picker_of_closest<match_t, NCA>::pick(candidates);
+    ap_uint<NCA> calo_track_link_bit = 0;
+    calo_track_link_bit[best.idx] = (best.val >= eDR2MAX) ? 0 : 1;
+    return calo_track_link_bit;
+}
+
+
+template<int DR2MAX, int NTK, int NCA, typename DR_T>
+void pick_closest(const DR_T calo_track_drval[NTK][NCA], ap_uint<NCA> calo_track_link_bit[NTK]) {
+    const DR_T eDR2MAX = DR2MAX;
+    for (int it = 0; it < NTK; ++it) {
+        typedef match<DR_T,ap_uint<ct_log2_ceil<NCA>::value>> match_t;
+        match_t candidates[NCA];
+        #pragma HLS ARRAY_PARTITION variable=candidates complete
+        for (int i = 0; i < NCA; ++i) {
+            candidates[i] = match_t(calo_track_drval[it][i], i);
+        }
+        match_t best = picker_of_closest<match_t, NCA>::pick(candidates);
+        calo_track_link_bit[it] = 0;
+        calo_track_link_bit[it][best.idx] = (best.val >= eDR2MAX) ? 0 : 1;
+    }
+}
+
+
+void tk2calo_link_dronly(const HadCaloObj calo[NCALO], const TkObj track[NTRACK], const pt_t tkPtErr[NTRACK], ap_uint<NCALO> calo_track_link_bit[NTRACK]) {
+    const int DR2MAX = PFALGO_DR2MAX_TK_CALO;
+    tk2calo_dr_t drvals[NTRACK][NCALO];
+    #pragma HLS ARRAY_PARTITION variable=drvals complete dim=0
+
+    tk2calo_drvals<DR2MAX>(calo, track, tkPtErr, drvals);
+    pick_closest<DR2MAX,NTRACK,NCALO,tk2calo_dr_t>(drvals, calo_track_link_bit);
+}
+
+void tk2calo_link_drdpt(const HadCaloObj calo[NCALO], const TkObj track[NTRACK], const pt_t tkPtErr[NTRACK], ap_uint<NCALO> calo_track_link_bit[NTRACK]) {
+    const int DR2MAX = PFALGO_DR2MAX_TK_CALO;
+    const int DQMAX = 5*DR2MAX;
+    for (int i = 0; i < NTRACK; ++i) {
+        #pragma HLS unroll
+        tk2calo_dq_t drvals[NCALO];
+        #pragma HLS ARRAY_PARTITION variable=drvals complete dim=0
+
+        tk2calo_drdptvals<DR2MAX>(calo, track[i], tkPtErr[i], drvals);
+        calo_track_link_bit[i] = pick_closest<DQMAX,NCALO,tk2calo_dq_t>(drvals);
+    }
+}
+
+pt_t tk2calo_tkerr(const TkObj & track, const PFRegion & region) {
+    const float f_edges[PTERR_BINS]  = PTERR_EDGES;
+    const float f_offss[PTERR_BINS]  = PTERR_OFFS;
+    const float f_scales[PTERR_BINS] = PTERR_SCALE;
+    glbeta_t edges[PTERR_BINS];
+    ptErrScale_t scales[PTERR_BINS];
+    ptErrOffs_t offss[PTERR_BINS];
+    for (int i = 0; i < PTERR_BINS; ++i) {
+       #pragma HLS unroll
+       edges[i] = Scales::makeGlbEta(f_edges[i]);
+       scales[i] = f_scales[i];
+       offss[i] = f_offss[i];
+    
+    }
+    glbeta_t abseta = region.hwGlbEta(track.hwEta);
+    if (abseta < 0) abseta = -abseta;
+    
+    ptErrScale_t scale = 0.3125;
+    ptErrOffs_t offs = 7.0;
+    for (int i = 0; i < PTERR_BINS; ++i) {
+        if (abseta < edges[i]) {
+           scale = scales[i];
+           offs  = offss[i];
+           break;
+        }
+    }
+    pt_t ptErr = track.hwPt * scale + offs;
+    if (ptErr > track.hwPt) ptErr = track.hwPt;
+    return ptErr;
+}
+
+void tk2calo_tkerr(const PFRegion & region, const TkObj track[NTRACK], pt_t tkerr[NTRACK]) {
+    for (int it = 0; it < NTRACK; ++it) {
+        tkerr[it] = tk2calo_tkerr(track[it], region);
+    }
+}
+
+void tk2calo_tkerr2(pt_t tkerr[NTRACK], pt2_t tkerr2[NTRACK]) {
+    for (int it = 0; it < NTRACK; ++it) {
+        pt2_t prod = tkerr[it] * tkerr[it];
+#ifdef L1PF_DSP_LATENCY3
+        #pragma HLS resource variable=prod latency=3
+#endif
+        tkerr2[it] = prod;
+    }
+}
+
+//-------------------------------------------------------
+// TK-MU Algos
+//-------------------------------------------------------
+
+void mu2trk_dptvals(const MuObj mu[NMU], const TkObj track[NTRACK], pt_t mu_track_dptval[NMU][NTRACK]) {
+    const ap_uint<12> DR2MAX = PFALGO_DR2MAX_TK_MU;
+    for (int im = 0; im < NMU; ++im) {
+        for (int it = 0; it < NTRACK; ++it) {
+            dpt_t dpt = mu[im].hwPt - track[it].hwPt;
+            if (track[it].isPFLoose() && dr2_int_cap<12>(mu[im].hwEta, mu[im].hwPhi, track[it].hwEta, track[it].hwPhi, DR2MAX) < DR2MAX) {
+                mu_track_dptval[im][it] = (dpt > 0 ? pt_t(dpt) : pt_t(-dpt));
+            } else {
+                mu_track_dptval[im][it] = mu[im].hwPt >> 1;
+            }
+        }
+    }
+}
+
+void mu2trk_linkstep(const MuObj mu[NMU], const pt_t mu_track_dptval[NMU][NTRACK], ap_uint<NMU> mu_track_link_bit[NTRACK]) {
+    for (int it = 0; it < NTRACK; ++it) {
+        mu_track_link_bit[it] = 0;
+    }
+    for (int im = 0; im < NMU; ++im) {
+        typedef match<pt_t,ap_uint<ct_log2_ceil<NTRACK>::value>> match_t;
+        match_t candidates[NTRACK];
+        #pragma HLS ARRAY_PARTITION variable=candidates complete
+        for (int i = 0; i < NTRACK; ++i) {
+            candidates[i] = match_t(mu_track_dptval[im][i], i);
+        }
+        match_t best = picker_of_closest<match_t, NTRACK>::pick(candidates);
+        bool link = best.val < (mu[im].hwPt >> 1);
+        mu_track_link_bit[best.idx][im] = link ? 1 : 0;
+    }
+}
+
+void mutrk_link(const MuObj mu[NMU], const TkObj track[NTRACK], ap_uint<NMU> mu_track_link_bit[NTRACK]) {
+    #pragma HLS ARRAY_PARTITION variable=mu complete
+    #pragma HLS ARRAY_PARTITION variable=track complete
+    #pragma HLS ARRAY_PARTITION variable=mu_track_link_bit complete dim=0
+
+    pt_t dptvals[NMU][NTRACK];
+    #pragma HLS ARRAY_PARTITION variable=dptvals complete dim=0
+
+    mu2trk_dptvals(mu, track, dptvals);
+    mu2trk_linkstep(mu, dptvals, mu_track_link_bit);
+}
+
+void pfmualgo(const MuObj mu[NMU], const TkObj track[NTRACK], const ap_uint<NMU> mu_track_link_bit[NTRACK], PFChargedObj pfmuout[NMU], bool isMu[NTRACK]) {
+    #pragma HLS ARRAY_PARTITION variable=isMu complete
+
+    for (int im = 0; im < NMU; ++im) {
+        bool good = false;
+        int ibest = -1;
+        for (int it = 0; it < NTRACK; ++it) {
+            if (mu_track_link_bit[it][im]){ good = true; ibest = it; }
+        }
+        if (mu[im].hwPt > 0 && good && ibest != -1) {
+            pfmuout[im].hwPt  = track[ibest].hwPt;
+            pfmuout[im].hwEta = track[ibest].hwEta;
+            pfmuout[im].hwPhi = track[ibest].hwPhi;
+            pfmuout[im].hwId  = ParticleID::mkMuon(track[ibest].hwCharge);
+            pfmuout[im].hwDEta = track[ibest].hwDEta;
+            pfmuout[im].hwDPhi = track[ibest].hwDPhi;
+            pfmuout[im].hwZ0  = track[ibest].hwZ0;
+            pfmuout[im].hwDxy  = track[ibest].hwDxy;
+            pfmuout[im].hwTkQuality = track[ibest].hwQuality;
+            isMu[ibest] = 1;
+        } else {
+            clear(pfmuout[im]);
+        }
+    }
+}
+
+

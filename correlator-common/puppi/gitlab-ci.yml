@@ -1,0 +1,65 @@
+.puppi-rules-csim:
+  rules:
+    - if: '( $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^test/ )'
+      changes: 
+        - pf/**/*
+        - puppi/**/*
+        - dataformats/**/*
+        - data/**/*
+        - utils/**/*
+        - common/**/*
+    - if: '( $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_PIPELINE_SOURCE == "web" )'
+
+.linpuppi-hls-common:
+  variables:
+    VIVADO_HLS_LOG_ID: linpuppi-$${puppiReg}
+    WORKDIR: puppi
+  parallel:
+    matrix:
+      - puppiReg: [Barrel, HGCal]
+        VIVADO_HLS_TCL_SCRIPT: run_hls_linpuppi_tracker.tcl
+      - puppiReg: [HGCalNoTK, HF]
+        VIVADO_HLS_TCL_SCRIPT: run_hls_linpuppi_forward.tcl
+
+
+puppi:csim:
+  extends:
+    - .vivado_hls_csim
+    - .linpuppi-hls-common
+    - .puppi-rules-csim
+  tags: [ vivado20192-csim ]
+  variables:
+    puppiBoard: none
+
+
+puppi:csynth:
+  extends:
+    - .vivado_hls_csynth
+    - .linpuppi-hls-common
+  variables:
+    puppiBoard: VCU118
+
+
+.puppiSort-hls-common:
+  variables:
+    puppiReg: HGCal
+    VIVADO_HLS_LOG_ID: puppiSort-hybrid-HGCal
+    VIVADO_HLS_TCL_SCRIPT: run_hls_puppi_sort.tcl
+    WORKDIR: puppi
+
+
+puppiSort:csim:
+  tags: [ vivado20192-csim ]
+  extends:
+    - .vivado_hls_csim
+    - .puppiSort-hls-common
+    - .puppi-rules-csim
+
+
+puppiSort:csynth:
+  extends:
+    - .vivado_hls_csynth
+    - .puppiSort-hls-common
+  variables:
+    sortAlgo: hybrid
+
