@@ -55,7 +55,7 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
   /////////////////////////////////////////////
   static T merge_merge_objs[NL1_EGOUT];//empty for newEvent == 1, and then 01, 0123, 01234 and so on 
   static unsigned int regionindex;//zero for newEvent == 1, and then 1, 2, 3, 4 and so on
-  #pragma HLS ARRAY_PARTITION variable=merge_merge_objs complete dim=1
+  #pragma HLS ARRAY_PARTITION variable=merge_merge_objs complete
   if (newEvent) {
     for(int i = 0; i < NL1_EGOUT; i++) {
       #pragma HLS unroll
@@ -67,7 +67,7 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
 
   /////////////////////////////////////////////
   static T objs_in_0[NOBJ], objs_in_1[NOBJ];//to store 10 objects in regions 0, 2, 4, 6 and so on
-  #pragma HLS ARRAY_PARTITION variable=objs_in_0 complete dim=1
+  #pragma HLS ARRAY_PARTITION variable=objs_in_0 complete
   if (regionindex %2 == 0) {//if region is 0, 2, 4 and so on
     for(int i = 0; i < NOBJ; i++) {
       #pragma HLS unroll
@@ -80,7 +80,7 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
       objs_in_1[i] = objs_in[i];//10 objects stire for regions 0, 2, 4, 6 and so on
     }
     T merge_objs[NL1_EGOUT];
-    #pragma HLS ARRAY_PARTITION variable=merge_objs complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=merge_objs complete
     merge_sort(objs_in_0, objs_in_1, merge_objs);//10, 10, 16 //merge regions 01, then 23, then 45 and so on
     
     merge_sort(merge_merge_objs, merge_objs, merge_merge_objs);//10, 10, 16 //merge empty and regions 01, then 01 and 23, then 0123 and 45 and so on
