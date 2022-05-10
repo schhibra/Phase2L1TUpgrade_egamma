@@ -45,7 +45,7 @@ void merge_sort(const T in1[NOBJ], const T in2[NOBJ], T sorted_out[NL1_EGOUT]) {
 
 // MAIN SORTER (CALLED FROM TOP FUNCTION) //////////////////////////////////////////
 template <typename T>
-void pftkegsorter_barrel(bool newEvent, bool lastregion,
+void pftkegsorter_barrel(bool newBoard, bool lastregion,
 			 const T objs_in[NOBJ], 
 			 T objs_out[NL1_EGOUT]) {
   #pragma HLS inline
@@ -53,15 +53,15 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
   #pragma HLS array_partition variable=objs_out complete
     
   /////////////////////////////////////////////
-  static T merge_merge_objs[NL1_EGOUT];//empty for newEvent == 1, and then 01, 0123, 01234 and so on 
-  static unsigned int regionindex;//zero for newEvent == 1, and then 1, 2, 3, 4 and so on
+  static T merge_merge_objs[NL1_EGOUT];//empty for newBoard == 1, and then 01, 0123, 01234 and so on 
+  static unsigned int regionindex;//zero for newBoard == 1, and then 1, 2, 3, 4 and so on
   #pragma HLS ARRAY_PARTITION variable=merge_merge_objs complete
-  if (newEvent) {
+  if (newBoard) {
     for(int i = 0; i < NL1_EGOUT; i++) {
       #pragma HLS unroll
-      merge_merge_objs[i].clear();//empty for newEvent == 1; size 16
+      merge_merge_objs[i].clear();//empty for newBoard == 1; size 16
     }
-    regionindex = 0;//zero for newEvent == 1
+    regionindex = 0;//zero for newBoard == 1
   }
   /////////////////////////////////////////////
 
@@ -89,9 +89,9 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
   /////////////////////////////////////////////
 
   /////////////////////////////////////////////
-  if (lastregion) {//if total #regions is odd number (e.g. 9 for HGCal)
-    merge_sort(merge_merge_objs, objs_in, merge_merge_objs);//10, 10, 16 //merge 01 and 2 if total #regions is 3; merge 0123 and 4 if total #regions is 5 and so on
-  }
+  /* if (lastregion) {//if total #regions is odd number (e.g. 9 for HGCal) */
+  /*   merge_sort(merge_merge_objs, objs_in, merge_merge_objs);//10, 10, 16 //merge 01 and 2 if total #regions is 3; merge 0123 and 4 if total #regions is 5 and so on */
+  /* } */
   /////////////////////////////////////////////
   
  fill_loop: for(unsigned int i = 0; i < NL1_EGOUT; i++) {//output 16 objects
@@ -146,11 +146,11 @@ void pftkegsorter_barrel_unpack_out(const ap_uint<T::BITWIDTH> packed_objs_out[N
 ////////////////////////////////////////////////////////////////////////////////////
 
 // TOP FUNCTION ////////////////////////////////////////////////////////////////////
-void packed_pftkegsorter_barrel_pho(bool newEvent, bool lastregion,
+void packed_pftkegsorter_barrel_pho(bool newBoard, bool lastregion,
 		       const ap_uint<l1ct::EGIsoObj::BITWIDTH> packed_objs_in[NOBJ],
                        ap_uint<l1ct::EGIsoObj::BITWIDTH> packed_objs_out[NL1_EGOUT]);
 
-void packed_pftkegsorter_barrel_ele(bool newEvent, bool lastregion,
+void packed_pftkegsorter_barrel_ele(bool newBoard, bool lastregion,
 		       const ap_uint<l1ct::EGIsoEleObj::BITWIDTH> packed_objs_in[NOBJ],
                        ap_uint<l1ct::EGIsoEleObj::BITWIDTH> packed_objs_out[NL1_EGOUT]);
 ////////////////////////////////////////////////////////////////////////////////////

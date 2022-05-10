@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
       /////////////////////////////////////////////////////////
       
       // firmware /////////////////////////////////////////////
-      bool newEvent = true;
+      bool newBoard = true;
             
       ap_uint<l1ct::EGIsoObj::BITWIDTH> photons_sorted[NOBJSORTED];
       ap_uint<l1ct::EGIsoEleObj::BITWIDTH> electrons_sorted[NOBJSORTED];
@@ -106,10 +106,10 @@ int main(int argc, char *argv[]) {
       	pftkegsorter_barrel_pack_in(photons_in, packed_photons_in);
       	pftkegsorter_barrel_pack_in(electrons_in, packed_electrons_in);
 
-	packed_pftkegsorter_barrel_pho(newEvent, lastregion, packed_photons_in, photons_sorted);
-      	packed_pftkegsorter_barrel_ele(newEvent, lastregion, packed_electrons_in, electrons_sorted);
+	packed_pftkegsorter_barrel_pho(newBoard, lastregion, packed_photons_in, photons_sorted);
+      	packed_pftkegsorter_barrel_ele(newBoard, lastregion, packed_electrons_in, electrons_sorted);
 
-      	if(newEvent) newEvent = false;
+      	if(newBoard) newBoard = false;
       }
 
       l1ct::EGIsoObj photons_out[NOBJSORTED];
