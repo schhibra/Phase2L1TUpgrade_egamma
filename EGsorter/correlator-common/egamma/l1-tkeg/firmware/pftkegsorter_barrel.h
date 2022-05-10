@@ -5,7 +5,7 @@
 #include "../../../dataformats/layer1_emulator.h"
 #include "../../../common/firmware/bitonic_hybrid.h"
 
-#define NOBJ 16
+#define NOBJ 10
 #define NL1_EGOUT 16
 
 // BITONIC SORTER (CALLED FROM MAIN SORTER) ////////////////////////////////////////
@@ -51,7 +51,8 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
   #pragma HLS inline
   #pragma HLS array_partition variable=objs_in complete
   #pragma HLS array_partition variable=objs_out complete
-
+    
+  /////////////////////////////////////////////
   static T merge_merge_objs[NL1_EGOUT];//empty for newEvent == 1, and then 01, 0123, 01234 and so on 
   static unsigned int regionindex;//zero for newEvent == 1, and then 1, 2, 3, 4 and so on
   #pragma HLS ARRAY_PARTITION variable=merge_merge_objs complete dim=1
@@ -62,26 +63,36 @@ void pftkegsorter_barrel(bool newEvent, bool lastregion,
     }
     regionindex = 0;//zero for newEvent == 1
   }
-  
-  static T objs_in_tmp[NOBJ];//to store 10 objects in regions 0, 2, 4, 6 and so on
-  #pragma HLS ARRAY_PARTITION variable=objs_in_tmp complete dim=1
-  if (regionindex %2 == 0)//if region is 0, 2, 4 and so on
+  /////////////////////////////////////////////
+
+  /////////////////////////////////////////////
+  static T objs_in_0[NOBJ], objs_in_1[NOBJ];//to store 10 objects in regions 0, 2, 4, 6 and so on
+  #pragma HLS ARRAY_PARTITION variable=objs_in_0 complete dim=1
+  if (regionindex %2 == 0) {//if region is 0, 2, 4 and so on
     for(int i = 0; i < NOBJ; i++) {
       #pragma HLS unroll
-      objs_in_tmp[i] = objs_in[i];//10 objects stire for regions 0, 2, 4, 6 and so on
+      objs_in_0[i] = objs_in[i];//10 objects stire for regions 0, 2, 4, 6 and so on
     }
+  }
   else {//if region is 1, 3, 5 and so on
+    for(int i = 0; i < NOBJ; i++) {
+      #pragma HLS unroll
+      objs_in_1[i] = objs_in[i];//10 objects stire for regions 0, 2, 4, 6 and so on
+    }
     T merge_objs[NL1_EGOUT];
     #pragma HLS ARRAY_PARTITION variable=merge_objs complete dim=1
-    merge_sort(objs_in_tmp, objs_in, merge_objs);//10, 10, 16 //merge regions 01, then 23, then 45 and so on
+    merge_sort(objs_in_0, objs_in_1, merge_objs);//10, 10, 16 //merge regions 01, then 23, then 45 and so on
     
     merge_sort(merge_merge_objs, merge_objs, merge_merge_objs);//10, 10, 16 //merge empty and regions 01, then 01 and 23, then 0123 and 45 and so on
   }
   regionindex++;
-  
+  /////////////////////////////////////////////
+
+  /////////////////////////////////////////////
   if (lastregion) {//if total #regions is odd number (e.g. 9 for HGCal)
     merge_sort(merge_merge_objs, objs_in, merge_merge_objs);//10, 10, 16 //merge 01 and 2 if total #regions is 3; merge 0123 and 4 if total #regions is 5 and so on
   }
+  /////////////////////////////////////////////
   
  fill_loop: for(unsigned int i = 0; i < NL1_EGOUT; i++) {//output 16 objects
     #pragma HLS unroll

@@ -36,7 +36,7 @@ namespace l1ct {
 	}
 	else
 	  pho.clear();
-	  
+	
 	photons_in[i] = pho;
       }
     }
@@ -60,7 +60,7 @@ namespace l1ct {
     	       const std::vector<OutputRegion>& outregions,
     	       const std::vector<unsigned int>& region_index,
     	       std::vector<T>& eg_sorted_inBoard) {
-
+      
       // we copy to be able to resize them
       std::vector<std::vector<T>> objs_in;
       objs_in.reserve(nObjToSort_);
@@ -74,15 +74,15 @@ namespace l1ct {
       }
       
       merge(objs_in, eg_sorted_inBoard);
-	
+      
       if (debug_) {
 	std::cout<<"objs.size() size "<<eg_sorted_inBoard.size()<<"\n";
     	for (const auto &out : eg_sorted_inBoard) std::cout<<"kinematics of sorted objetcs "<<out.hwPt<<" "<<out.hwEta<<" "<<out.hwPhi<<"\n";
       }
     }
-
+    
   private:
-
+    
     void extractEGObjEmu(const PFRegionEmu& region,
                          const l1ct::OutputRegion& outregion,
                          std::vector<l1ct::EGIsoObjEmu>& eg) {
@@ -103,7 +103,7 @@ namespace l1ct {
         //global_objects.back().hwPhi = region.hwGlbPhi(reg_obj.hwPhi);//<=========== uncomment this
       }
     }
-	
+    
     template <typename T>
       void resize_input(std::vector<T> &in) const {
       if (in.size() > nObjToSort_) {
@@ -115,7 +115,7 @@ namespace l1ct {
 	}
       }
     }
-
+    
     template <typename T>
       void merge_regions(const std::vector<T> &in_region1,
 			 const std::vector<T> &in_region2,
@@ -128,15 +128,15 @@ namespace l1ct {
       if (debug_) for (const auto &tmp : out) std::cout<<"out reverse "<<tmp.hwPt<<" "<<tmp.hwEta<<" "<<tmp.hwPhi<<"\n";      
       std::copy(in_region2.begin(), in_region2.end(), std::back_inserter(out));
       if (debug_) for (const auto &tmp : out) std::cout<<"out inserted "<<tmp.hwPt<<" "<<tmp.hwEta<<" "<<tmp.hwPhi<<"\n";
-
+      
       hybridBitonicMergeRef(&out[0], out.size(), 0, false);
-
+      
       if (out.size() > nOut) {
 	out.resize(nOut);
 	if (debug_) for (const auto &tmp : out) std::cout<<"final "<<tmp.hwPt<<" "<<tmp.hwEta<<" "<<tmp.hwPhi<<"\n";
       }
     }
-
+    
     template <typename T>
       void merge(const std::vector<std::vector<T>> &in_objs, std::vector<T> &out) const {
       if (in_objs.size() == 1) {//size is 1, fine!
@@ -150,10 +150,10 @@ namespace l1ct {
       else {		
 	std::vector<T> pair_merge_01;//size is >2, merge 0 and 1 regions always
 	merge_regions(in_objs[0], in_objs[1], pair_merge_01, nObjSorted_);//10, 10, 16
-
+	
 	std::vector<std::vector<T>> to_merge;
 	if (in_objs.size() == 3) to_merge.push_back(pair_merge_01);//push 01 only if size is 3 //and then in_objs[id] will be pushed into it
-
+	
 	std::vector<T> pair_merge_tmp = pair_merge_01;//
 	for (unsigned int id = 2, idn = 3; id < in_objs.size(); id += 2, idn = id + 1) {
           if (idn >= in_objs.size()) {//if size is odd number starting from 3
@@ -162,7 +162,7 @@ namespace l1ct {
 	  else {
 	    std::vector<T> pair_merge;
 	    merge_regions(in_objs[id], in_objs[idn], pair_merge, nObjSorted_);//10, 10, 16 // merge two regions: 23, 45, 67, and so on
-
+	    
 	    pair_merge_tmp.resize(nObjToSort_);
 	    pair_merge.resize(nObjToSort_);
 	    merge_regions(pair_merge_tmp, pair_merge, pair_merge_tmp, nObjSorted_);//10, 10, 16 //merge 23 with 01 for first time // then merge 45, and then 67, and then 89, and so on  
@@ -176,7 +176,7 @@ namespace l1ct {
 	else out = pair_merge_tmp;//if size is even number, e.g. 6, out is 012345 (or we can say to_merge[to_merge.size()-1])  
       }
     }
-
+    
     unsigned int nObjToSort_;
     unsigned int nObjSorted_;
     bool debug_;

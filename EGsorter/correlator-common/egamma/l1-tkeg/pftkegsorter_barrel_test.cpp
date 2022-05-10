@@ -28,9 +28,9 @@ int main(int argc, char *argv[]) {
 
   size_t pos;
   do {
-      pos = text.find(comma_delimiter);
-      args.push_back(text.substr(0, pos));
-      text.erase(0, pos + comma_delimiter.length());
+    pos = text.find(comma_delimiter);
+    args.push_back(text.substr(0, pos));
+    text.erase(0, pos + comma_delimiter.length());
   }
   while (pos != std::string::npos);
 
