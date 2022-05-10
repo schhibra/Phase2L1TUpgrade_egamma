@@ -1,0 +1,23 @@
+src -c correlator-common:common/vhdl bit_delay.vhd 
+src -c correlator-common:common/vhdl word_delay.vhd
+src --vhdl2008 regionizer_data.vhd
+src --vhdl2008 rolling_fifo.vhd
+src --vhdl2008 fifo_merge2.vhd
+src --vhdl2008 fifo_merge2_full.vhd
+src --vhdl2008 fifo_merge3.vhd
+src --vhdl2008 stream_sort.vhd
+src --vhdl2008 cascade_stream_sort_elem.vhd
+src --vhdl2008 cascade_stream_sort.vhd
+src --vhdl2008 region_mux.vhd
+src --vhdl2008 tk_router_element.vhd
+src --vhdl2008 tk_router.vhd
+src --vhdl2008 calo_router.vhd
+src --vhdl2008 mu_router.vhd
+src --vhdl2008 region_mux_stream.vhd
+src --vhdl2008 tk_regionizer.vhd
+src --vhdl2008 mu_regionizer.vhd
+src --vhdl2008 calo_regionizer.vhd
+src --vhdl2008 pfregion_loop.vhd
+src --vhdl2008 full_regionizer_mux.vhd
+src --vhdl2008 delay_sort_mux_stream.vhd
+src --vhdl2008 full_regionizer_mux_stream.vhd
