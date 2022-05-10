@@ -165,7 +165,7 @@ namespace l1ct {
 
 	    pair_merge_tmp.resize(nObjToSort_);
 	    pair_merge.resize(nObjToSort_);
-	    merge_regions(pair_merge_tmp, pair_merge, pair_merge_tmp, nObjSorted_);//16, 16, 16 ===> 10, 10, 16 //merge 23 with 01 for first time // then merge 45, and then 67, and then 89, and so on  
+	    merge_regions(pair_merge_tmp, pair_merge, pair_merge_tmp, nObjSorted_);//10, 10, 16 //merge 23 with 01 for first time // then merge 45, and then 67, and then 89, and so on  
 	    to_merge.push_back(pair_merge_tmp);//push back 0123, 012345, 01234567, and so on (remember 01 is the 0th element)
 	  }
 	}

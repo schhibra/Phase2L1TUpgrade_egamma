@@ -95,9 +95,6 @@ int main(int argc, char *argv[]) {
 	if (debug) std::cout<<"region-index "<<i<<"\n";
 	  
 	bool lastregion = false; if (region_index[iboard].size() %2 == 1 && i == region_index[iboard].size()-1) lastregion = true;
-	bool region_odd = false; if (i %2 == 1) region_odd = true;//(0, false) (1, true) (2, false) (3, true) 
-
-	if (debug) std::cout<<"region_odd "<<region_odd<<"\n";
 
       	l1ct::EGIsoObj photons_in[NOBJTOSORT];
         l1ct::EGIsoEleObj electrons_in[NOBJTOSORT];
@@ -109,8 +106,8 @@ int main(int argc, char *argv[]) {
       	pftkegsorter_barrel_pack_in(photons_in, packed_photons_in);
       	pftkegsorter_barrel_pack_in(electrons_in, packed_electrons_in);
 
-	packed_pftkegsorter_barrel_pho(newEvent, lastregion, region_odd, packed_photons_in, photons_sorted);
-      	packed_pftkegsorter_barrel_ele(newEvent, lastregion, region_odd, packed_electrons_in, electrons_sorted);
+	packed_pftkegsorter_barrel_pho(newEvent, lastregion, packed_photons_in, photons_sorted);
+      	packed_pftkegsorter_barrel_ele(newEvent, lastregion, packed_electrons_in, electrons_sorted);
 
       	if(newEvent) newEvent = false;
       }
