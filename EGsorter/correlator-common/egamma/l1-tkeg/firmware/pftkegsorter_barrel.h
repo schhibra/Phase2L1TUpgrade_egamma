@@ -49,7 +49,7 @@ void pftkegsorter_barrel(bool newBoard, bool lastregion,
 			 const l1ct::PFRegion & region,
 			 const T objs_in[NOBJ], 
 			 T objs_out[NL1_EGOUT],
-			 unsigned int Nboards, bool &validout) {
+			 unsigned int Nregions, bool &validout) {
   #pragma HLS inline
   #pragma HLS array_partition variable=objs_in complete
   #pragma HLS array_partition variable=objs_out complete
@@ -109,7 +109,7 @@ void pftkegsorter_barrel(bool newBoard, bool lastregion,
   /*   merge_sort(merge_merge_objs, objs_in, merge_merge_objs);//10, 10, 16 //merge 01 and 2 if total #regions is 3; merge 0123 and 4 if total #regions is 5 and so on */
   /* } */
   /////////////////////////////////////////////
-  if (regionindex == Nboards) {
+  if (regionindex == Nregions) {
     validout = true;
     
   fill_loop: for(unsigned int i = 0; i < NL1_EGOUT; i++) {//output 16 objects
@@ -178,12 +178,12 @@ void packed_pftkegsorter_barrel_pho(bool newBoard, bool lastregion,
 				    const ap_uint<l1ct::PFRegion::BITWIDTH> & packed_region,
 				    const ap_uint<l1ct::EGIsoObj::BITWIDTH> packed_objs_in[NOBJ],
 				    ap_uint<l1ct::EGIsoObj::BITWIDTH> packed_objs_out[NL1_EGOUT],
-				    unsigned int Nboards, bool &validout);
+				    unsigned int Nregions, bool &validout);
 
 void packed_pftkegsorter_barrel_ele(bool newBoard, bool lastregion,
 				    const ap_uint<l1ct::PFRegion::BITWIDTH> & packed_region,
 				    const ap_uint<l1ct::EGIsoEleObj::BITWIDTH> packed_objs_in[NOBJ],
 				    ap_uint<l1ct::EGIsoEleObj::BITWIDTH> packed_objs_out[NL1_EGOUT],
-				    unsigned int Nboards, bool &validout);
+				    unsigned int Nregions, bool &validout);
 ////////////////////////////////////////////////////////////////////////////////////
 #endif
