@@ -77,7 +77,7 @@ namespace l1ct {
       
       if (debug_) {
 	std::cout<<"objs.size() size "<<eg_sorted_inBoard.size()<<"\n";
-    	for (const auto &out : eg_sorted_inBoard) std::cout<<"kinematics of sorted objetcs "<<out.hwPt<<" "<<out.hwEta<<" "<<out.hwPhi<<"\n";
+    	for (const auto &out : eg_sorted_inBoard) std::cout<<"kinematics of sorted objects "<<out.hwPt<<" "<<out.hwEta<<" "<<out.hwPhi<<"\n";
       }
     }
     
@@ -99,8 +99,8 @@ namespace l1ct {
 			   std::vector<T>& global_objects) {
       for (const auto& reg_obj : regional_objects) {
         global_objects.emplace_back(reg_obj);
-        //global_objects.back().hwEta = region.hwGlbEta(reg_obj.hwEta);//<=========== uncomment this
-        //global_objects.back().hwPhi = region.hwGlbPhi(reg_obj.hwPhi);//<=========== uncomment this
+        global_objects.back().hwEta = region.hwGlbEta(reg_obj.hwEta);//<=========== uncomment this
+        global_objects.back().hwPhi = region.hwGlbPhi(reg_obj.hwPhi);//<=========== uncomment this
       }
     }
     
@@ -163,15 +163,15 @@ namespace l1ct {
 	    std::vector<T> pair_merge;
 	    merge_regions(in_objs[id], in_objs[idn], pair_merge, nObjSorted_);//10, 10, 16 // merge two regions: 23, 45, 67, and so on
 	    
-	    pair_merge_tmp.resize(nObjToSort_);
-	    pair_merge.resize(nObjToSort_);
-	    merge_regions(pair_merge_tmp, pair_merge, pair_merge_tmp, nObjSorted_);//10, 10, 16 //merge 23 with 01 for first time // then merge 45, and then 67, and then 89, and so on  
+	    //pair_merge_tmp.resize(nObjToSort_);
+	    //pair_merge.resize(nObjToSort_);
+	    merge_regions(pair_merge_tmp, pair_merge, pair_merge_tmp, nObjSorted_);//16, 16, 16 //merge 23 with 01 for first time // then merge 45, and then 67, and then 89, and so on  
 	    to_merge.push_back(pair_merge_tmp);//push back 0123, 012345, 01234567, and so on (remember 01 is the 0th element)
 	  }
 	}
 	if (in_objs.size() % 2 == 1) {
-	  to_merge[to_merge.size()-2].resize(nObjToSort_);
-	  merge_regions(to_merge[to_merge.size()-2], to_merge[to_merge.size()-1], out, nObjSorted_);//10, 10, 16 //e.g. is size is 3, we merge 01 and 2, if size is 7, we merge 012345 and 6
+	  //to_merge[to_merge.size()-2].resize(nObjToSort_);
+	  merge_regions(to_merge[to_merge.size()-2], to_merge[to_merge.size()-1], out, nObjSorted_);//16, 16, 16 //e.g. is size is 3, we merge 01 and 2, if size is 7, we merge 012345 and 6
 	}
 	else out = pair_merge_tmp;//if size is even number, e.g. 6, out is 012345 (or we can say to_merge[to_merge.size()-1])  
       }
